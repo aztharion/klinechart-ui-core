@@ -4,6 +4,7 @@
 > Powered by [klinecharts](https://klinecharts.com) v10.1, React 19, Tailwind CSS v4, and Radix UI.
 > Fully self-contained: zero backend dependencies, zero third-party UI framework lock-in, with inlined headless state and drawing engines.
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Online-success?logo=githubpages&logoColor=white)](https://aztharion.github.io/klinechart-ui-core/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-v4-0F172A?logo=tailwindcss&logoColor=38BDF8)](https://tailwindcss.com/)

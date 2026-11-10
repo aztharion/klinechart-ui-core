@@ -11,7 +11,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy": "pnpm build && (cd dist && rm -rf .git && git init && git checkout -b gh-pages && git add -A && git commit -m 'deploy: GitHub Pages build' && git remote add origin https://github.com/aztharion/klinechart-ui-core.git && git push origin gh-pages --force && rm -rf .git)"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.1",
