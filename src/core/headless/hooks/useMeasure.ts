@@ -1,0 +1,161 @@
+import { useCallback, useEffect, useRef } from "react";
+import { useKlinechartsUI } from "../provider/ChartTerminalContext";
+import { removeOverlayScoped } from "../utils/overlays";
+import type { MeasurePoint, MeasureResult } from "../provider/featureTypes";
+
+export type { MeasurePoint, MeasureResult } from "../provider/featureTypes";
+
+export interface UseMeasureReturn {
+  /** Whether measure mode is active (waiting for clicks) */
+  isActive: boolean;
+  /** Start measure mode — next two clicks on chart set from/to */
+  startMeasure: () => void;
+  /** Cancel measure mode */
+  cancelMeasure: () => void;
+  /** Current measurement result (null until both points are set) */
+  result: MeasureResult | null;
+  /** Clear the current measurement */
+  clearResult: () => void;
+  /** First point (set after first click) */
+  fromPoint: MeasurePoint | null;
+}
+
+const MEASURE_OVERLAY_ID = "__measure_line__";
+
+function computeResult(from: MeasurePoint, to: MeasurePoint): MeasureResult {
+  const priceDiff = to.price - from.price;
+  const pricePercent = from.price !== 0 ? (priceDiff / from.price) * 100 : 0;
+  const bars = Math.abs(to.barIndex - from.barIndex);
+  const timeDiff = Math.abs(to.timestamp - from.timestamp);
+  return { from, to, priceDiff, pricePercent, bars, timeDiff };
+}
+
+/**
+ * Headless hook for measuring distance/time/percentage between two points.
+ *
+ * Activates measure mode, captures two clicks on the chart via overlay
+ * interaction, then computes price diff, %, bar count, and time diff. The
+ * measure state (active/from/result) lives in the shared provider store, so a
+ * toolbar toggle and a separate result-readout panel stay in sync no matter
+ * where each is mounted.
+ */
+export function useMeasure(): UseMeasureReturn {
+  const { state, dispatch } = useKlinechartsUI();
+  const { isActive, fromPoint, result } = state.measure;
+
+  // The draw-end callback below outlives the render that created it (it fires
+  // on a later user click), so it must not close over `state.chart` from
+  // startMeasure time: after a chart swap that instance is gone and
+  // getDataList() would measure against discarded data. (`dispatch` is stable
+  // and safe to close over.)
+  const chartRef = useRef(state.chart);
+  useEffect(() => {
+    chartRef.current = state.chart;
+  }, [state.chart]);
+
+  const cleanup = useCallback(() => {
+    // Scoped: a foreign overlay reusing the id must not be removed.
+    if (state.chart) {
+      removeOverlayScoped(state.chart, {
+        id: MEASURE_OVERLAY_ID,
+        groupId: "measure",
+      });
+    }
+  }, [state.chart]);
+
+  const startMeasure = useCallback(() => {
+    cleanup();
+    // Without a chart there is nothing to click on: activating the mode here
+    // left `isActive` stuck true with no overlay and no reconciliation (the
+    // only exit used to be an explicit cancelMeasure).
+    if (!state.chart) return;
+    dispatch({
+      type: "SET_MEASURE",
+      measure: { isActive: true, fromPoint: null, result: null },
+    });
+
+    // Create a segment overlay that the user draws by clicking two points.
+    // The onDrawEnd callback fires when the user finishes placing both points.
+    state.chart.createOverlay({
+      name: "segment",
+      id: MEASURE_OVERLAY_ID,
+      groupId: "measure",
+      styles: {
+        line: {
+          style: "dashed" as any,
+          color: "#FFD600",
+          size: 1,
+        },
+      },
+      lock: true,
+      onDrawEnd: (event: any) => {
+        const overlay = event?.overlay;
+        const points = overlay?.points;
+        if (!points || points.length < 2) return;
+
+        const chart = chartRef.current;
+        if (!chart) return;
+
+        const dataList = chart.getDataList();
+        if (!dataList || dataList.length === 0) return;
+
+        const makePoint = (p: any): MeasurePoint => {
+          const idx = Math.max(
+            0,
+            Math.min(p.dataIndex ?? 0, dataList.length - 1),
+          );
+          const bar = dataList[idx];
+          return {
+            price: p.value ?? bar?.close ?? 0,
+            timestamp: bar?.timestamp ?? 0,
+            barIndex: idx,
+          };
+        };
+
+        const from = makePoint(points[0]);
+        const to = makePoint(points[1]);
+
+        dispatch({
+          type: "SET_MEASURE",
+          measure: {
+            isActive: false,
+            fromPoint: from,
+            result: computeResult(from, to),
+          },
+        });
+      },
+    });
+  }, [state.chart, cleanup, dispatch]);
+
+  const cancelMeasure = useCallback(() => {
+    cleanup();
+    dispatch({ type: "SET_MEASURE", measure: { isActive: false, fromPoint: null } });
+  }, [cleanup, dispatch]);
+
+  const clearResult = useCallback(() => {
+    cleanup();
+    dispatch({ type: "SET_MEASURE", measure: { result: null, fromPoint: null } });
+  }, [cleanup, dispatch]);
+
+  // Clean up the overlay on unmount.
+  useEffect(() => {
+    const chart = state.chart;
+    return () => {
+      if (chart) {
+        removeOverlayScoped(chart, {
+          id: MEASURE_OVERLAY_ID,
+          groupId: "measure",
+        });
+      }
+    };
+  }, [state.chart]);
+
+  return {
+    isActive,
+    startMeasure,
+    cancelMeasure,
+    result,
+    clearResult,
+    fromPoint,
+  };
+}

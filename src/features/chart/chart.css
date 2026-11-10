@@ -1,0 +1,143 @@
+/**
+ * TradeDash-matched typography + palette for /chart.
+ *
+ * jtrader globally:
+ * - scales :root font-size down to 14–15px on laptop (breaks Tailwind rem sizes)
+ * - uses Poppins / Be Vietnam Pro + text-rendering: optimizeLegibility
+ * - uses jtrader green theme tokens
+ *
+ * TradeDash uses fixed 16px, system UI fonts, and blue-gray terminal tokens.
+ */
+
+/* Tailwind rem units follow html — lock while chart is mounted */
+html:has(.chart-app) {
+  font-size: 16px !important;
+}
+
+.chart-app {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Trebuchet MS",
+    Roboto,
+    Ubuntu,
+    "Be Vietnam Pro",
+    "Poppins",
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+
+  /* TradeDash light tokens (chart theme toggle may switch html.dark) */
+  color-scheme: light;
+  --radius: 0.5rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.55 0.22 264);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.003 260);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.96 0.003 260);
+  --muted-foreground: oklch(0.5 0.01 260);
+  --accent: oklch(0.95 0.004 260);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.9 0.005 260);
+  --input: oklch(0.9 0.005 260);
+  --ring: oklch(0.55 0.22 264);
+  --bull: oklch(0.62 0.11 184);
+  --bear: oklch(0.62 0.2 25);
+}
+
+.dark .chart-app {
+  color-scheme: dark;
+  --background: oklch(0.21 0.013 260);
+  --foreground: oklch(0.9 0.01 260);
+  --card: oklch(0.25 0.014 260);
+  --card-foreground: oklch(0.9 0.01 260);
+  --popover: oklch(0.25 0.014 260);
+  --popover-foreground: oklch(0.9 0.01 260);
+  --primary: oklch(0.62 0.2 264);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.32 0.015 260);
+  --secondary-foreground: oklch(0.95 0.01 260);
+  --muted: oklch(0.3 0.014 260);
+  --muted-foreground: oklch(0.65 0.015 260);
+  --accent: oklch(0.34 0.016 260);
+  --accent-foreground: oklch(0.97 0.01 260);
+  --destructive: oklch(0.62 0.2 25);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.62 0.2 264);
+  --bull: oklch(0.72 0.11 184);
+  --bear: oklch(0.66 0.2 25);
+}
+
+.chart-app :where(button, input, select, textarea) {
+  font: inherit;
+}
+
+html:has(.chart-app) :where(
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [data-slot="dropdown-menu-item"]:not([data-disabled]),
+  [data-slot="context-menu-item"]:not([data-disabled]),
+  [data-slot="tabs-trigger"]
+) {
+  cursor: pointer;
+}
+
+.chart-app :where(.font-sans, .font-heading) {
+  font-family: inherit;
+}
+
+/* TradeDash compact control sizes (jtrader buttons are slightly taller) */
+.chart-app :where([data-slot="button"][data-size="icon-sm"]) {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.chart-app :where([data-slot="button"][data-size="sm"]) {
+  height: 1.75rem;
+  padding-inline: 0.625rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.chart-app :where([data-slot="tooltip-content"]) {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.chart-google-signin > div,
+.chart-google-signin iframe {
+  margin-inline: auto;
+}
+
+/* Match klinecharts canvas tooltip legend (Helvetica Neue 12px, grey labels). */
+.chart-pane-legend {
+  /* Financial values use tabular monospace glyphs so widths stay stable while prices move. */
+  font-family: "Courier New", Consolas, ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 12px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: auto;
+  text-rendering: geometricPrecision;
+}
+
+.chart-pane-legend-label {
+  color: #76808f;
+}
+
+.dark .chart-pane-legend-label {
+  color: #929aa5;
+}

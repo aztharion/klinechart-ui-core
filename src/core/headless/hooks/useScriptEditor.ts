@@ -1,0 +1,360 @@
+import { useState, useCallback, useEffect, useRef, useId } from "react";
+import { registerIndicator } from "klinecharts";
+import type { Chart, KLineData } from "klinecharts";
+import { useKlinechartsUI } from "../provider/ChartTerminalContext";
+import TA from "../utils/TA";
+
+const DEFAULT_SCRIPT = `// Custom Indicator — Pine Script Style
+// Available: TA, dataList, params
+
+const period = params[0] ?? 14
+const closes = dataList.map(d => d.close)
+const highs  = dataList.map(d => d.high)
+const lows   = dataList.map(d => d.low)
+
+// Example: RSI + Bollinger Bands
+const rsi  = TA.rsi(closes, period)
+const boll = TA.bollinger(closes, period, 2)
+
+// Return one object per candle — each key = one line on chart
+return rsi.map((v, i) => ({
+  rsi:   v,
+  upper: boll.upper[i],
+  mid:   boll.mid[i],
+  lower: boll.lower[i],
+}))`;
+
+const SERIES_COLORS = [
+  "#2962FF",
+  "#FF6D00",
+  "#00BCD4",
+  "#E91E63",
+  "#76FF03",
+  "#FFD600",
+];
+
+/** Keys shadowed inside the sandbox so user code cannot access them. */
+const SHADOW_KEYS = [
+  "fetch",
+  "XMLHttpRequest",
+  "WebSocket",
+  "Worker",
+  "SharedWorker",
+  "importScripts",
+  "self",
+  "caches",
+  "indexedDB",
+];
+
+let scriptCounter = 0;
+
+export type ScriptPlacement = "main" | "sub";
+
+export interface UseScriptEditorReturn {
+  /** Current script source code */
+  code: string;
+  setCode: (code: string) => void;
+  /** Display name of the script */
+  scriptName: string;
+  setScriptName: (name: string) => void;
+  /** Comma-separated numeric params (e.g. "14, 26, 9") */
+  params: string;
+  setParams: (params: string) => void;
+  /** Where to place the indicator */
+  placement: ScriptPlacement;
+  setPlacement: (p: ScriptPlacement) => void;
+  /** Last error message (empty = no error) */
+  error: string;
+  /** Last status message */
+  status: string;
+  /** Whether the script is currently running */
+  isRunning: boolean;
+  /** Whether there is a script indicator currently on the chart */
+  hasActiveScript: boolean;
+  /** Execute the script and register the indicator */
+  runScript: () => void;
+  /** Remove the current script indicator from the chart */
+  removeScript: () => void;
+  /** Reset code to the default template */
+  resetCode: () => void;
+  /** Export the current code as a downloadable .js file */
+  exportScript: () => void;
+  /** Import a script from a File object */
+  importScript: (file: File) => void;
+  /** The default template code */
+  defaultScript: string;
+}
+
+/**
+ * Headless hook for a Pine Script-style custom indicator editor.
+ *
+ * Scripts are plain JavaScript function bodies that receive:
+ *   - `TA`       — technical analysis math library
+ *   - `dataList` — KLineData[] (open, high, low, close, volume, timestamp)
+ *   - `params`   — number[] from the params input
+ *
+ * Must return an array of objects, one per candle. Each key = one chart series.
+ */
+export function useScriptEditor(): UseScriptEditorReturn {
+  const { state } = useKlinechartsUI();
+
+  const [code, setCode] = useState(DEFAULT_SCRIPT);
+  const [scriptName, setScriptName] = useState("");
+  const [params, setParams] = useState("14");
+  const [placement, setPlacement] = useState<ScriptPlacement>("sub");
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+
+  // The live script binding. `hasActiveScript` is reactive so the UI (e.g. a
+  // "Remove" button) updates immediately when a script is run/removed. The
+  // owning chart is stored alongside the ids: the chart is NOT remounted on a
+  // symbol/period change but IS replaced on remount, and the new instance has
+  // none of our indicators — deriving `hasActiveScript` with a chart-identity
+  // check (instead of a bare non-null flag) stops the UI from claiming a live
+  // script whose ids point at a discarded chart, with no reset effect needed.
+  const [active, setActive] = useState<{
+    chart: Chart;
+    name: string;
+    id: string | null;
+  } | null>(null);
+  const activeRef = useRef(active);
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+  const hasActiveScript = active !== null && active.chart === state.chart;
+
+  // A running script indicator can vanish behind our back — loadLayout wipes
+  // every indicator via chart.removeIndicator without telling this hook —
+  // leaving hasActiveScript true with a Remove button that no-ops. Reconcile
+  // against the chart when the provider's indicator lists change (a layout
+  // load dispatches SET_MAIN/SUB_INDICATORS in the same commit).
+  useEffect(() => {
+    if (!active || active.chart !== state.chart || !active.id) return;
+    if (state.chart!.getIndicators({ id: active.id }).length === 0) {
+      setActive(null);
+      setStatus("Indicator removed.");
+    }
+  }, [active, state.chart, state.mainIndicators, state.subIndicators]);
+  // Per-instance salt for the registered template name (same pattern as
+  // useCompare). The klinecharts registry is global: two provider instances
+  // (multi-chart workspace) sharing one template name would silently
+  // recompute chart A's indicator with chart B's code/params.
+  const instanceSalt = useId().replace(/[^a-zA-Z0-9]/g, "");
+
+  const runScript = useCallback(() => {
+    const chart = state.chart;
+    if (!chart) {
+      setError("Chart not initialized");
+      return;
+    }
+
+    setError("");
+    setStatus("Running...");
+    setIsRunning(true);
+
+    try {
+      const parsedParams = params
+        .split(",")
+        .map((s) => parseFloat(s.trim()))
+        .filter((n) => !isNaN(n));
+
+      const dataList = (chart as any).getDataList?.() ?? [];
+
+      // Compile the user script once. `calc` (registered below) re-executes
+      // this compiled function against the live `dataList` on every chart data
+      // change, so the indicator extends to streamed/scrolled-in bars. The
+      // previous implementation cached a one-time `result` array in `calc`,
+      // which went stale as data length changed.
+      const allArgs = [
+        ...SHADOW_KEYS,
+        "TA",
+        "dataList",
+        "params",
+        `"use strict";\n${code}`,
+      ];
+      const compiledFn = new Function(...allArgs);
+      const shadowValues = SHADOW_KEYS.map(() => undefined);
+      // Run once against the current data to validate the return shape and
+      // surface errors to the user; the registered `calc` re-runs later.
+      const sampleResult = compiledFn(
+        ...shadowValues,
+        TA,
+        dataList,
+        parsedParams,
+      );
+
+      if (!Array.isArray(sampleResult)) {
+        throw new Error("Script must return an Array.");
+      }
+
+      const sample = sampleResult.find(
+        (v: unknown) => v !== null && v !== undefined,
+      );
+      const seriesKeys: string[] = sample ? Object.keys(sample) : ["value"];
+      if (seriesKeys.length === 0) {
+        throw new Error("Returned objects have no keys.");
+      }
+
+      scriptCounter++;
+      // Use a STABLE indicator template name per hook instance and let
+      // `registerIndicator` overwrite the previous registration: klinecharts
+      // exposes no unregister API, so an incrementing name would leak a
+      // template into the global registry on every Run. The per-instance
+      // salt (useId) fixes the cross-provider collision — an unsalted name
+      // made a script run on chart B silently recompute chart A's indicator
+      // with B's code and params. Trade-off accepted: the registry now grows
+      // O(mounts) of script-editor components instead of O(1), and separate
+      // React roots share the klinecharts registry with independent useId
+      // counters, so the salt is unique only within one root.
+      // `scriptCounter` is still used for display names below.
+      const indicatorName = `_custom_script_active_${instanceSalt}`;
+
+      const figures = seriesKeys.map((key, i) => ({
+        key,
+        title: `${key}: `,
+        type: "line" as const,
+        styles: () => ({ color: SERIES_COLORS[i % SERIES_COLORS.length] }),
+      }));
+
+      registerIndicator({
+        name: indicatorName,
+        shortName:
+          (scriptName.trim() || `Script #${scriptCounter}`) +
+          (placement === "main" ? " (Main)" : " (Sub)"),
+        calcParams: parsedParams,
+        figures: figures as any,
+        calc: (liveDataList: KLineData[]) =>
+          compiledFn(...shadowValues, TA, liveDataList, parsedParams),
+        extendData: {
+          isCustomScript: true,
+          code,
+          placement,
+        },
+      });
+
+      // Remove the previous custom script indicator, from the chart it was
+      // created on (after a chart swap that instance is gone and its ids are
+      // meaningless on the new one).
+      const prev = activeRef.current;
+      if (prev && prev.id) {
+        try {
+          prev.chart.removeIndicator({
+            id: prev.id,
+            name: prev.name,
+          } as any);
+        } catch {
+          // ignore
+        }
+      }
+
+      // Add to chart. klinecharts v10 createIndicator returns the indicator id
+      // (the old pane-id return was a beta artefact). Main placement stacks the
+      // custom indicator over the candle series on the candle pane.
+      let indicatorId: string | null = null;
+      if (placement === "main") {
+        indicatorId = chart.createIndicator(
+          { name: indicatorName, paneId: "candle_pane" },
+          true,
+        );
+      } else {
+        indicatorId = chart.createIndicator({ name: indicatorName }, false);
+      }
+
+      const bound: { chart: Chart; name: string; id: string | null } = {
+        chart,
+        name: indicatorName,
+        id: typeof indicatorId === "string" ? indicatorId : null,
+      };
+      activeRef.current = bound;
+      setActive(bound);
+
+      const title = scriptName.trim() || `Script #${scriptCounter}`;
+      setStatus(
+        `${title} applied to ${placement === "main" ? "Main Chart" : "Sub Pane"} — ${seriesKeys.length} series: ${seriesKeys.join(", ")}`,
+      );
+    } catch (e: any) {
+      setError(e?.message ?? String(e));
+    } finally {
+      setIsRunning(false);
+    }
+  }, [state.chart, code, scriptName, params, placement, instanceSalt]);
+
+  const removeScript = useCallback(() => {
+    const prev = activeRef.current;
+    if (prev && prev.id) {
+      try {
+        prev.chart.removeIndicator({
+          id: prev.id,
+          name: prev.name,
+        } as any);
+      } catch {
+        // ignore
+      }
+      activeRef.current = null;
+      setActive(null);
+      setStatus("Indicator removed.");
+    }
+  }, []);
+
+  const resetCode = useCallback(() => {
+    setCode(DEFAULT_SCRIPT);
+    setError("");
+    setStatus("");
+  }, []);
+
+  const exportScript = useCallback(() => {
+    const blob = new Blob([code], {
+      type: "text/javascript;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${scriptName.trim() || "custom_indicator"}.js`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStatus("Script exported.");
+  }, [code, scriptName]);
+
+  const importScript = useCallback(
+    (file: File) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        if (content) {
+          setCode(content);
+          if (!scriptName) {
+            setScriptName(file.name.replace(/\.(js|ts|txt)$/i, ""));
+          }
+          setError("");
+          setStatus(`Loaded ${file.name}`);
+        }
+      };
+      reader.readAsText(file);
+    },
+    [scriptName],
+  );
+
+  return {
+    code,
+    setCode,
+    scriptName,
+    setScriptName,
+    params,
+    setParams,
+    placement,
+    setPlacement,
+    error,
+    status,
+    isRunning,
+    hasActiveScript,
+    runScript,
+    removeScript,
+    resetCode,
+    exportScript,
+    importScript,
+    defaultScript: DEFAULT_SCRIPT,
+  };
+}
