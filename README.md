@@ -9,6 +9,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-v4-0F172A?logo=tailwindcss&logoColor=38BDF8)](https://tailwindcss.com/)
 [![KlineCharts](https://img.shields.io/badge/KlineCharts-v10.1-f97316)](https://klinecharts.com/)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/aztharion)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-38d591.svg)](https://github.com/aztharion/klinechart-ui-core/pulls)
 
@@ -282,6 +283,16 @@ klinechart-ui-core/
 ├── tsconfig.json
 └── vite.config.ts
 ```
+
+---
+
+## Sponsor
+
+If this project helps accelerate your trading systems or web applications, please consider supporting its ongoing development:
+
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-pink?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/aztharion)
+
+Your sponsorship helps maintain active datafeed adapters, add new technical drawing tools, and keep the terminal framework modern and accessible for everyone.
 
 ---
 
