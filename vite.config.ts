@@ -6,6 +6,7 @@ import { defineConfig } from "vite"
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   return {
+    base: "./",
     plugins: [react(), tailwindcss()],
     define:
       mode === "development"
