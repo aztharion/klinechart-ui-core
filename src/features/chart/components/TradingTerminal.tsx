@@ -150,7 +150,7 @@ export function TradingTerminal({
     () => customDatafeed ?? defaultDatafeedRegistry,
     [customDatafeed],
   )
-  const initialTheme = loadPersisted<string>("theme", "dark")
+  const initialTheme = loadPersisted<string>("theme", "light")
 
   useEffect(() => {
     syncChartSymbolToUrl(setSearchParams, bootstrap.symbol)
