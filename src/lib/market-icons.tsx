@@ -64,9 +64,10 @@ const EXCHANGE_BRANDS: Record<
 };
 
 /** Bundled exchange logos (Simple Icons has no Bybit/Bitget entries). */
+const basePrefix = import.meta.env.BASE_URL || "/";
 const LOCAL_EXCHANGE_ICONS: Record<string, string> = {
-  bybit: "/icons/exchanges/bybit.svg",
-  bitget: "/icons/exchanges/bitget.svg",
+  bybit: `${basePrefix}icons/exchanges/bybit.svg`.replace(/([^:]\/)\/+/g, "$1"),
+  bitget: `${basePrefix}icons/exchanges/bitget.svg`.replace(/([^:]\/)\/+/g, "$1"),
 };
 
 function exchangeIconUrl(sourceId: string): string | null {

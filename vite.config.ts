@@ -6,7 +6,7 @@ import { defineConfig } from "vite"
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   return {
-    base: "./",
+    base: mode === "production" ? "/klinechart-ui-core/" : "/",
     plugins: [react(), tailwindcss()],
     define:
       mode === "development"
