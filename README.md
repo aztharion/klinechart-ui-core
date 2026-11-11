@@ -13,19 +13,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-38d591.svg)](https://github.com/aztharion/klinechart-ui-core/pulls)
 
-```text
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │  BTCUSDT · Binance   15m   Indicators   Compare   Themes   [Fullscreen]    │
-  ├──────┬──────────────────────────────────────────────────────────┬──────┤
-  │ [/]  │  Candlestick / Heikin-Ashi Canvas                        │Watch-│
-  │ [—]  │                                                          │list  │
-  │ [F]  │  Volume Profile (VPVR & FRVP) Engine                     ├──────┤
-  │ [M]  │                                                          │Order-│
-  │ [R]  │  Drawing Overlays & Order Lines                          │Book  │
-  │      │                                                          ├──────┤
-  │ [S]  │  Visual Risk / Reward Tool (SL / TP Dragging)            │Info  │
-  └──────┴──────────────────────────────────────────────────────────┴──────┘
-```
+[![KlineChart UI Core Preview](assets/preview.jpg)](https://aztharion.github.io/klinechart-ui-core/)
 
 ---
 
