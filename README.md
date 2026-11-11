@@ -242,6 +242,7 @@ export function App() {
 
 ```text
 klinechart-ui-core/
+├── assets/                 # Repository media & terminal preview screenshots
 ├── public/
 │   ├── fonts/              # Poppins & Be Vietnam Pro webfonts
 │   ├── icons/              # Exchange badges & market identifiers
